@@ -56,7 +56,17 @@ def create_zip(pages_dict):
             zip_file.writestr(filename, html_content)
     return zip_buffer.getvalue()
 
-def generate_dalle_image(api_key, image_prompt):
+# --- API KEY MANAGEMENT (UPDATED) ---
+try:
+    api_key = st.secrets["OPENAI_API_KEY"]
+except FileNotFoundError:
+    st.error("Secrets file not found. Please add your OpenAI API Key to `.streamlit/secrets.toml`.")
+    st.stop()
+except KeyError:
+    st.error("OpenAI API Key not found in secrets. Please check your configuration.")
+    st.stop()
+
+def generate_dalle_image(image_prompt):
     client = OpenAI(api_key=api_key)
     try:
         response = client.images.generate(
@@ -66,7 +76,7 @@ def generate_dalle_image(api_key, image_prompt):
     except Exception:
         return "https://placehold.co/1024x1024/222/FFF?text=Image+Generation+Error"
 
-def generate_final_package(api_key, model_name, data):
+def generate_final_package(model_name, data):
     client = OpenAI(api_key=api_key)
     attributes_final = ", ".join(data.get('final_attributes', []))
     
@@ -128,7 +138,8 @@ def generate_final_package(api_key, model_name, data):
 # --- UI: SIDEBAR ---
 with st.sidebar:
     st.title("💎 Config")
-    api_key = st.text_input("OpenAI API Key", type="password")
+    # API Key Input Removed - Using Secrets
+    
     if st.button("Restart"):
         st.session_state.clear()
         st.rerun()
@@ -285,9 +296,6 @@ with st.container():
         st.markdown('<div class="sub-text">Do you want to use this attribute set or customize it?</div>', unsafe_allow_html=True)
         mode = st.radio("Mode:", ["Use Suggested", "Customize"], label_visibility="collapsed")
         
-        # Placeholder for custom input if needed, though radio usually resets logic
-        # We will handle customization in the logic block
-        
         if st.button("Next ➝"):
             st.session_state.data["attr_mode"] = mode
             if mode == "Use Suggested":
@@ -362,24 +370,21 @@ with st.container():
         data = st.session_state.data
         
         if "result" not in st.session_state:
-            if not api_key:
-                st.error("⚠️ Please enter OpenAI API Key in the sidebar first!")
-            else:
-                st.info("⚡ Generating Single Home Page & Product Data...")
-                img_prompt = f"Professional hero image for {data.get('name')}, {data.get('business_model')}. Theme: {data.get('vibe')}."
+            st.info("⚡ Generating Single Home Page & Product Data...")
+            img_prompt = f"Professional hero image for {data.get('name')}, {data.get('business_model')}. Theme: {data.get('vibe')}."
+            
+            with st.spinner("Processing..."):
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    f_gpt = executor.submit(generate_final_package, "gpt-4o", data)
+                    f_img = executor.submit(generate_dalle_image, img_prompt)
+                    res = f_gpt.result()
+                    img_url = f_img.result()
                 
-                with st.spinner("Processing..."):
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        f_gpt = executor.submit(generate_final_package, api_key, "gpt-4o", data)
-                        f_img = executor.submit(generate_dalle_image, api_key, img_prompt)
-                        res = f_gpt.result()
-                        img_url = f_img.result()
-                    
-                    if "ui_pages" in res and "Home" in res["ui_pages"]:
-                        res["ui_pages"]["Home"] = res["ui_pages"]["Home"].replace("HERO_IMAGE_PLACEHOLDER", img_url)
-                    
-                    st.session_state.result = res
-                    st.session_state.img_url = img_url
+                if "ui_pages" in res and "Home" in res["ui_pages"]:
+                    res["ui_pages"]["Home"] = res["ui_pages"]["Home"].replace("HERO_IMAGE_PLACEHOLDER", img_url)
+                
+                st.session_state.result = res
+                st.session_state.img_url = img_url
 
         if "result" in st.session_state:
             res = st.session_state.result
