@@ -68,7 +68,7 @@ if "data" not in st.session_state: st.session_state.data = {}
 if "generation_complete" not in st.session_state: st.session_state.generation_complete = False
 if "show_success" not in st.session_state: st.session_state.show_success = False
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! I am your Senior Creative Director.\n\nLet's build a complete **Data-Driven Digital Presence**. First, what is your **Business Name**?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hello! I am your BizOnboard Builder.\n\nLet's build a complete **Data-Driven Digital Presence**. First, what is your **Business Name**?"}]
 
 # --- CONSTANTS ---
 BUSINESS_TYPES = [
